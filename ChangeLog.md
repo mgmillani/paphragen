@@ -1,6 +1,7 @@
 # Revision history for paphragen
 
 ## 0.1.0.0  -- 2016-12-30
+## 0.2.0.0  -- 2016-12-30
 
 * First version.
     - A dictionary can be built based on text files.

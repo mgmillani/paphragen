@@ -27,7 +27,7 @@ import System.Environment
 import System.IO
 
 appname = "paphragen"
-appversion = "0.1.0.0"
+appversion = "0.2.0.0"
 
 data Command = Help | Build | Generate deriving(Eq, Show, Ord)
 data Action =
@@ -37,6 +37,7 @@ data Action =
   , passLength  :: Int
   , passEntropy :: Int
   , inputFiles  :: [FilePath]
+  , infoFun     :: String -> IO ()
   }
 
 defaultAction =
@@ -46,8 +47,13 @@ defaultAction =
   , passLength  = 0
   , passEntropy = 100
   , inputFiles  = []
+  , infoFun     = putStrLn
   }
 
+quiet :: String -> IO ()
+quiet _ = return ()
+
+-- | Splits a text into words.
 wordSplit [] = []
 wordSplit text =
   (map toLower word) : (wordSplit rest)
@@ -55,20 +61,25 @@ wordSplit text =
     (word, text') = span isLetter text
     rest = dropWhile (not . isLetter) text'
 
+-- | Writes a dictionary to a file. The file will have one word per line in ascending alphabetical order.
 writeDictionary dict handle = do
   mapM_ (hPutStrLn handle) $ map fst $ Map.toAscList dict
 
+-- | Loads a dictionary from a file.
 loadDictionary fl = do
   text <- readFile fl
   return $ lines text
 
+-- | Insert words into a dictionary, increasing their count if they already exist.
 insertWords dict text = foldl (\d w -> Map.insertWith (+) w 1 d) dict $ wordSplit text
 
+-- | Reads a dictionary from a file.
 readDictionary dict [] = return dict
 readDictionary dict (f:fs) = do
   text <- readFile f
   readDictionary (insertWords dict text) fs
 
+-- | Builds a dictionary form a list of files, writing the output to the given handle.
 buildDictionary files out = do
   rawDict <- readDictionary Map.empty files
   let dictionary = Map.filterWithKey (\w c -> length w > 1 && length w < 8) $ rawDict
@@ -77,6 +88,8 @@ buildDictionary files out = do
       common     = Map.filter (>= threshold) dictionary
   writeDictionary common out
 
+-- | Take elements from a list with the given indices. The first component of the tuple is the index on the list. The second element is preserved.
+-- | This is used to draw many words from a list without having to iterate through it multiple times.
 takeIndices is ds =
   takeIndices' 0 is ds
   where
@@ -96,6 +109,7 @@ randomIndices n rs
     x = mask B..&. (fromIntegral $ BS.foldl accum (0 :: W.Word) (BS.take bytes rs))
     accum b x = (B.shift b 8) B..|. (fromIntegral x)
 
+-- | Prints help text.
 help = do
   mapM_ putStrLn [
       appname ++ " " ++ appversion
@@ -124,18 +138,22 @@ parseArgs action args
     "--length":len:rs  -> parseArgs action{passLength  = read len} rs
     "-e":ent:rs  -> parseArgs action{passEntropy = read ent} rs
     "--entropy":ent:rs  -> parseArgs action{passEntropy = read ent} rs
+    "-q":rs             -> parseArgs action{infoFun     = quiet}    rs
+    "--quiet":rs        -> parseArgs action{infoFun     = quiet}    rs
     rs -> action{inputFiles = rs}
   | cmd action == Help = case args of
     "build":rs -> parseArgs action{cmd = Build} rs
     "generate":rs -> parseArgs action{cmd = Generate} rs
     rs -> parseOptions action rs
 parseOptions action args = case args of
-  "-o":file:rs -> parseArgs action{outFile    = file}     rs
-  "--output":file:rs -> parseArgs action{outFile    = file}     rs
-  "-l":len:rs  -> parseArgs action{passLength  = read len} rs
-  "--length":len:rs  -> parseArgs action{passLength  = read len} rs
-  "-e":ent:rs  -> parseArgs action{passEntropy = read ent} rs
+  "-o":file:rs        -> parseArgs action{outFile     = file}     rs
+  "--output":file:rs  -> parseArgs action{outFile     = file}     rs
+  "-l":len:rs         -> parseArgs action{passLength  = read len} rs
+  "--length":len:rs   -> parseArgs action{passLength  = read len} rs
+  "-e":ent:rs         -> parseArgs action{passEntropy = read ent} rs
   "--entropy":ent:rs  -> parseArgs action{passEntropy = read ent} rs
+  "-q":rs             -> parseArgs action{infoFun     = quiet}    rs
+  "--quiet":rs        -> parseArgs action{infoFun     = quiet}    rs
   _ -> action{cmd = Help}
 
 execute action
@@ -153,11 +171,11 @@ execGenerate action
   | otherwise = do
     dict <- (mapM loadDictionary $ inputFiles action) >>= (return . concat)
     let n = length dict
-    putStrLn $ "Dictionary has " ++ show n ++ " words."
+    (infoFun action) $ "Dictionary has " ++ show n ++ " words."
     let epw = logBase 2 (fromIntegral n)
-    putStrLn $ "This gives an entropy of " ++ show epw ++ " bits per word."
+    (infoFun action) $ "This gives an entropy of " ++ show epw ++ " bits per word."
     let k = if passLength action == 0 then ceiling $ (fromIntegral $ passEntropy action) / epw else passLength action
-    putStrLn $ "Generating a password with " ++ show k ++ " words (" ++ show ((fromIntegral k) * epw) ++ " bits of entropy)."
+    (infoFun action) $ "Generating a password with " ++ show k ++ " words (" ++ show ((fromIntegral k) * epw) ++ " bits of entropy)."
     randomness <- BS.getContents
     let indices = zip (take k $ randomIndices n randomness) [0..]
         sInd = sortBy (\x y -> (fst x) `compare` (fst y)) indices

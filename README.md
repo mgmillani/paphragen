@@ -43,7 +43,7 @@ To generate a password using an existing dictionary:
 
     paphragen generate [OPTIONS...] <DICTIONARY...>
 
-where OPTIONS are:
+where `OPTIONS` are:
 
     -e, --entropy N      sets the minimum desired entropy (default: 100 bits).
     -l, --length N       number of words to use (entropy is used by default).
