@@ -5,7 +5,7 @@ A passphrase is a password made with words instead of just letters and digits. T
 
 Most tools for password generation that we know just generate a random sequence of characters and cannot properly estimate the strength of a passphrase.
 
-`paphragen` is capable not only of generating passphrases from a given word list, it can also build such word lists given sufficient text input (e.g. books, news articles...). It also properly computes the strength of the generated password. A stream of random bytes can be used in order to achieve cryptographic quality randomness.
+`paphragen` is capable not only of generating passphrases from a given word list, it can also build such word lists given sufficient text input (e.g. books, news articles...). It also properly computes the strength of the generated password. A stream of random bytes can be used in order to achieve cryptographic-quality randomness.
 
 ## Building
 
